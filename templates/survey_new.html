@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}新建问卷 · 问卷系统{% endblock %}
+{% block content %}
+<section class="narrow-page">
+  <div class="page-heading compact">
+    <div>
+      <span class="eyebrow">NEW SURVEY</span>
+      <h1>新建问卷</h1>
+      <p class="muted">先创建草稿，再逐题添加内容和跳转规则。</p>
+    </div>
+  </div>
+  <form method="post" class="card form-stack">
+    <label>问卷标题 <span class="required-mark">*</span>
+      <input name="title" maxlength="200" required autofocus placeholder="例如：课程反馈调查">
+    </label>
+    <label>问卷说明
+      <textarea name="description" maxlength="2000" rows="4" placeholder="说明调查目的、填写方式或注意事项"></textarea>
+    </label>
+    <fieldset class="choice-group">
+      <legend>填写设置</legend>
+      <label class="check-line"><input type="checkbox" name="allow_anonymous"> 允许填写者匿名提交</label>
+      <label class="check-line"><input type="checkbox" name="allow_multiple"> 允许同一账号重复填写</label>
+    </fieldset>
+    <div class="form-actions">
+      <a class="button ghost" href="{{ url_for('surveys.dashboard') }}">取消</a>
+      <button class="button primary" type="submit">创建草稿</button>
+    </div>
+  </form>
+</section>
+{% endblock %}
+

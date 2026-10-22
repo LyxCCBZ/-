@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% block title %}{{ survey.title }} · 问卷管理{% endblock %}
+{% block content %}
+<section class="page-heading survey-heading">
+  <div>
+    <div class="card-row left">
+      <span class="badge badge-{{ survey.status }}">
+        {% if survey.status == 'draft' %}草稿{% elif survey.status == 'published' %}收集中{% else %}已关闭{% endif %}
+      </span>
+      <span class="muted small">公开编号：{{ survey.public_id }}</span>
+    </div>
+    <h1>{{ survey.title }}</h1>
+    <p class="muted">{{ survey.description or '暂无问卷说明' }}</p>
+  </div>
+  <div class="heading-actions">
+    <a class="button ghost" href="{{ url_for('surveys.stats', survey_id=survey._id) }}">查看统计（{{ submission_count }}）</a>
+    {% if survey.status == 'draft' %}
+      <form method="post" action="{{ url_for('surveys.publish_survey', survey_id=survey._id) }}">
+        <button class="button primary" type="submit">发布问卷</button>
+      </form>
+    {% elif survey.status == 'published' %}
+      <form method="post" action="{{ url_for('surveys.close_survey', survey_id=survey._id) }}" onsubmit="return confirm('关闭后填写者将无法继续提交，确定关闭吗？')">
+        <button class="button danger" type="submit">关闭问卷</button>
+      </form>
+    {% endif %}
+  </div>
+</section>
+
+{% if survey.status == 'published' %}
+  <section class="share-banner">
+    <div>
+      <strong>填写链接</strong>
+      <p class="muted small">填写者需要登录；匿名设置仅影响是否保存填写者身份。</p>
+    </div>
+    <input readonly value="{{ url_for('public.survey_intro', public_id=survey.public_id, _external=True) }}" onclick="this.select()">
+  </section>
+{% endif %}
+
+<div class="dashboard-columns">
+  <section class="card">
+    <div class="section-heading">
+      <div>
+        <h2>题目设计</h2>
+        <p class="muted small">草稿状态可添加题目；已发布问卷会锁定题目结构，以保护已有数据。</p>
+      </div>
+      <span class="pill">{{ questions|length }} 道题</span>
+    </div>
+
+    {% if survey.status == 'draft' %}
+      <details class="add-question" {% if not questions %}open{% endif %}>
+        <summary>＋ 添加题目</summary>
+        <form method="post" action="{{ url_for('surveys.add_question', survey_id=survey._id) }}" class="form-stack" id="question-form">
+          <div class="two-columns">
+            <label>题型
+              <select name="type" id="question-type" required>
+                <option value="single">单选题</option>
+                <option value="multiple">多选题</option>
+                <option value="text">文本填空</option>
+                <option value="number">数字填空</option>
+              </select>
+            </label>
+            <label class="check-line top-align"><input type="checkbox" name="required"> 必答题</label>
+          </div>
+          <label>题目内容 <span class="required-mark">*</span>
+            <input name="title" maxlength="300" required placeholder="例如：你最喜欢哪种学习方式？">
+          </label>
+          <div class="type-fields" data-types="single multiple">
+            <label>选项（每行一个）
+              <textarea name="options" rows="5" placeholder="选项 A&#10;选项 B&#10;选项 C"></textarea>
+            </label>
+          </div>
+          <div class="type-fields" data-types="multiple">
+            <div class="two-columns">
+              <label>最少选择数量
+                <input type="number" name="min_select" min="0" value="0">
+              </label>
+              <label>最多选择数量
+                <input type="number" name="max_select" min="1" placeholder="留空表示不限">
+              </label>
+            </div>
+          </div>
+          <div class="type-fields" data-types="text">
+            <div class="two-columns">
+              <label>最少字数
+                <input type="number" name="min_length" min="0" value="0">
+              </label>
+              <label>最多字数
+                <input type="number" name="max_length" min="1" placeholder="留空表示不限">
+              </label>
+            </div>
+          </div>
+          <div class="type-fields" data-types="number">
+            <div class="three-columns">
+              <label>最小值
+                <input type="number" step="any" name="minimum" placeholder="不限">
+              </label>
+              <label>最大值
+                <input type="number" step="any" name="maximum" placeholder="不限">
+              </label>
+              <label class="check-line top-align"><input type="checkbox" name="integer_only"> 只允许整数</label>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="button primary" type="submit">添加题目</button>
+          </div>
+        </form>
+      </details>
+    {% endif %}
+
+    {% if questions %}
+      <ol class="question-list">
+        {% for question in questions %}
+          <li class="question-item">
+            <div class="question-top">
+              <div>
+                <span class="question-number">Q{{ question.order }}</span>
+                <span class="badge badge-type">{{ {'single':'单选','multiple':'多选','text':'文本','number':'数字'}[question.type] }}</span>
+                {% if question.required %}<span class="badge badge-required">必答</span>{% endif %}
+              </div>
+              {% if survey.status == 'draft' %}
+                <form method="post" action="{{ url_for('surveys.delete_question', survey_id=survey._id, question_id=question._id) }}" onsubmit="return confirm('删除题目会同时清理指向它的跳转规则，确定删除吗？')">
+                  <button class="text-danger" type="submit">删除</button>
+                </form>
+              {% endif %}
+            </div>
+            <h3>{{ question.title }}</h3>
+            {% if question.options %}
+              <ul class="option-list">
+                {% for option in question.options %}
+                  <li><span>{{ option.key }}</span>{{ option.text }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+            {% if question.type == 'multiple' %}
+              <p class="muted small">选择数量：{{ question.validation.min_select }} - {{ question.validation.max_select }}</p>
+            {% elif question.type == 'text' %}
+              <p class="muted small">字数：{{ question.validation.min_length }} - {{ question.validation.max_length or '不限' }}</p>
+            {% elif question.type == 'number' %}
+              <p class="muted small">范围：{{ question.validation.minimum if question.validation.minimum is not none else '不限' }} ~ {{ question.validation.maximum if question.validation.maximum is not none else '不限' }}；{{ '仅整数' if question.validation.integer_only else '可为小数' }}</p>
+            {% endif %}
+
+            {% if question.jumps %}
+              <div class="jump-list">
+                <strong class="small">跳转规则（按顺序匹配）</strong>
+                {% for rule in question.jumps %}
+                  <div class="jump-row">
+                    <span>{{ rule.condition_label }} → {{ rule.target_label }}</span>
+                    {% if survey.status == 'draft' %}
+                      <form method="post" action="{{ url_for('surveys.delete_jump', survey_id=survey._id, question_id=question._id, rule_index=loop.index0) }}">
+                        <button class="text-danger small" type="submit">删除</button>
+                      </form>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            {% if survey.status == 'draft' %}
+              <details class="jump-editor">
+                <summary>＋ 添加跳转规则</summary>
+                <form method="post" action="{{ url_for('surveys.add_jump', survey_id=survey._id, question_id=question._id) }}" class="form-stack compact-form">
+                  <div class="three-columns">
+                    <label>条件
+                      <select name="operator">
+                        {% if question.type == 'single' %}
+                          <option value="eq">等于</option><option value="neq">不等于</option>
+                        {% elif question.type == 'multiple' %}
+                          <option value="includes_any">包含任意</option><option value="includes_all">包含全部</option><option value="not_includes">不包含</option>
+                        {% elif question.type == 'number' %}
+                          <option value="eq">等于</option><option value="neq">不等于</option><option value="gt">大于</option><option value="gte">大于等于</option><option value="lt">小于</option><option value="lte">小于等于</option><option value="between">介于</option>
+                        {% else %}
+                          <option value="contains">包含</option><option value="eq">等于</option><option value="neq">不等于</option>
+                        {% endif %}
+                      </select>
+                    </label>
+                    <label>条件值
+                      {% if question.type in ['single', 'multiple'] %}
+                        <input name="value" required placeholder="{{ '填写选项编号，例如 A' if question.type == 'single' else '多个编号用逗号分隔，例如 A,B' }}">
+                      {% elif question.type == 'number' %}
+                        <input name="value" required placeholder="数字；介于时写 18,60">
+                      {% else %}
+                        <input name="value" required placeholder="文本内容">
+                      {% endif %}
+                    </label>
+                    <label>跳转到
+                      <select name="target" required>
+                        <option value="END">结束问卷</option>
+                        {% for target in question.jump_targets %}
+                          <option value="{{ target._id }}">第 {{ target.order }} 题：{{ target.title }}</option>
+                        {% endfor %}
+                      </select>
+                    </label>
+                  </div>
+                  <div class="form-actions left-actions">
+                    <button class="button small" type="submit">添加规则</button>
+                  </div>
+                </form>
+              </details>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <div class="empty-inline">还没有题目，请先添加第一道题。</div>
+    {% endif %}
+  </section>
+
+  <aside class="side-column">
+    <section class="card form-stack">
+      <h2>问卷设置</h2>
+      <form method="post" action="{{ url_for('surveys.update_settings', survey_id=survey._id) }}" class="form-stack">
+        <label>标题
+          <input name="title" maxlength="200" required value="{{ survey.title }}">
+        </label>
+        <label>说明
+          <textarea name="description" rows="4" maxlength="2000">{{ survey.description }}</textarea>
+        </label>
+        <label>截止时间
+          <input type="datetime-local" name="deadline" value="{{ deadline_value }}">
+        </label>
+        {% if survey.status == 'draft' %}
+          <label class="check-line"><input type="checkbox" name="allow_anonymous" {% if survey.allow_anonymous %}checked{% endif %}> 允许匿名提交</label>
+          <label class="check-line"><input type="checkbox" name="allow_multiple" {% if survey.allow_multiple %}checked{% endif %}> 允许重复填写</label>
+        {% endif %}
+        <button class="button" type="submit" {% if survey.status == 'closed' %}disabled{% endif %}>保存设置</button>
+      </form>
+    </section>
+    <section class="card side-info">
+      <h2>数据概览</h2>
+      <dl class="stacked-stats">
+        <div><dt>已提交答卷</dt><dd>{{ submission_count }}</dd></div>
+        <div><dt>填写中答卷</dt><dd>{{ draft_count }}</dd></div>
+        <div><dt>发布时间</dt><dd>{{ format_local_datetime(survey.published_at, '尚未发布') }}</dd></div>
+      </dl>
+    </section>
+  </aside>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  const typeSelect = document.getElementById('question-type');
+  const refreshFields = () => {
+    if (!typeSelect) return;
+    const active = typeSelect.value;
+    document.querySelectorAll('.type-fields').forEach((node) => {
+      const visible = node.dataset.types.split(' ').includes(active);
+      node.hidden = !visible;
+      node.querySelectorAll('input, textarea, select').forEach((input) => {
+        input.disabled = !visible;
+      });
+    });
+  };
+  if (typeSelect) {
+    typeSelect.addEventListener('change', refreshFields);
+    refreshFields();
+  }
+</script>
+{% endblock %}
+

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ survey.title }} · 填写问卷{% endblock %}
+{% block content %}
+<section class="survey-cover">
+  <div class="card cover-card">
+    <span class="eyebrow">SURVEY</span>
+    <h1>{{ survey.title }}</h1>
+    <p class="cover-description">{{ survey.description or '感谢参与本次问卷填写。' }}</p>
+    <dl class="cover-meta">
+      <div><dt>题目数量</dt><dd>{{ question_count }}</dd></div>
+      <div><dt>截止时间</dt><dd>{{ deadline_text }}</dd></div>
+      <div><dt>匿名填写</dt><dd>{{ '允许' if survey.allow_anonymous else '不允许' }}</dd></div>
+    </dl>
+
+    {% if survey.status == 'published' %}
+      <form method="post" action="{{ url_for('public.start_attempt', public_id=survey.public_id) }}" class="start-form">
+        {% if survey.allow_anonymous %}
+          <label class="check-line framed-check"><input type="checkbox" name="anonymous"> 本次匿名提交（不保存账号身份）</label>
+        {% endif %}
+        <button class="button primary large" type="submit">开始填写</button>
+      </form>
+      <p class="muted small">题目会逐题显示，系统根据你的回答自动执行跳转。</p>
+    {% else %}
+      <div class="closed-notice">该问卷当前未开放填写。</div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
+

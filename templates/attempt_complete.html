@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}提交成功 · {{ survey.title }}{% endblock %}
+{% block content %}
+<section class="narrow-page">
+  <div class="card success-card">
+    <div class="success-icon">✓</div>
+    <h1>答卷已提交</h1>
+    <p>感谢你完成《{{ survey.title }}》。答卷已保存到 MongoDB。</p>
+    <p class="muted small">提交时间：{{ format_local_datetime(response.submitted_at) }}{% if response.is_anonymous %} · 匿名提交{% endif %}</p>
+    <a class="button ghost" href="{{ url_for('surveys.dashboard') }}">返回我的问卷</a>
+  </div>
+</section>
+{% endblock %}
+

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}登录 · 问卷系统{% endblock %}
+{% block content %}
+<section class="auth-card">
+  <div class="auth-copy">
+    <span class="eyebrow">QUESTIONNAIRE</span>
+    <h1>登录后管理你的问卷</h1>
+    <p>创建问卷、配置题目与跳转逻辑，并通过链接收集答卷。</p>
+  </div>
+  <form method="post" class="card form-card">
+    <h2>账号登录</h2>
+    <input type="hidden" name="next" value="{{ next_url or '' }}">
+    <label>用户名
+      <input name="username" autocomplete="username" required autofocus placeholder="请输入用户名">
+    </label>
+    <label>密码
+      <input type="password" name="password" autocomplete="current-password" required placeholder="请输入密码">
+    </label>
+    <button class="button primary wide" type="submit">登录</button>
+    <p class="muted center">还没有账号？<a href="{{ url_for('auth.register') }}">立即注册</a></p>
+  </form>
+</section>
+{% endblock %}
+

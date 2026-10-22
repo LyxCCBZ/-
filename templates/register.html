@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}注册 · 问卷系统{% endblock %}
+{% block content %}
+<section class="auth-card">
+  <div class="auth-copy">
+    <span class="eyebrow">CREATE ACCOUNT</span>
+    <h1>开始设计第一份问卷</h1>
+    <p>账号用于隔离问卷数据。填写者也必须登录后才能提交答卷。</p>
+  </div>
+  <form method="post" class="card form-card">
+    <h2>注册账号</h2>
+    <label>用户名
+      <input name="username" autocomplete="username" minlength="3" maxlength="30" required autofocus placeholder="3-30 位中文、字母、数字或下划线">
+    </label>
+    <label>密码
+      <input type="password" name="password" autocomplete="new-password" minlength="6" required placeholder="至少 6 位">
+    </label>
+    <label>确认密码
+      <input type="password" name="confirm_password" autocomplete="new-password" minlength="6" required placeholder="再次输入密码">
+    </label>
+    <button class="button primary wide" type="submit">注册</button>
+    <p class="muted center">已有账号？<a href="{{ url_for('auth.login') }}">返回登录</a></p>
+  </form>
+</section>
+{% endblock %}
+

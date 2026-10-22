@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}填写 · {{ survey.title }}{% endblock %}
+{% block content %}
+<section class="narrow-page taking-page">
+  <div class="progress-head">
+    <div>
+      <span class="eyebrow">IN PROGRESS</span>
+      <strong>{{ survey.title }}</strong>
+    </div>
+    <span class="muted">第 {{ question_number }} 题 / 共 {{ total_questions }} 题</span>
+  </div>
+  <div class="progress-track"><span style="width: {{ (question_number / total_questions * 100)|round(1) }}%"></span></div>
+
+  <form method="post" action="{{ url_for('public.answer_attempt', attempt_id=response._id) }}" class="card question-card">
+    {% if response.is_anonymous %}<span class="badge">匿名答卷</span>{% endif %}
+    <h1>{{ question.title }}{% if question.required %}<span class="required-mark">*</span>{% endif %}</h1>
+    {% if question.type == 'multiple' %}
+      <p class="muted small">请选择 {{ question.validation.min_select }} - {{ question.validation.max_select }} 项</p>
+    {% elif question.type == 'text' %}
+      <p class="muted small">字数要求：{{ question.validation.min_length }} - {{ question.validation.max_length or '不限' }}</p>
+    {% elif question.type == 'number' %}
+      <p class="muted small">范围：{{ question.validation.minimum if question.validation.minimum is not none else '不限' }} ~ {{ question.validation.maximum if question.validation.maximum is not none else '不限' }}{% if question.validation.integer_only %}；仅整数{% endif %}</p>
+    {% endif %}
+
+    {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+
+    <div class="answer-area">
+      {% if question.type == 'single' %}
+        {% for option in question.options %}
+          <label class="answer-option">
+            <input type="radio" name="answer" value="{{ option.key }}" {% if raw_value == option.key %}checked{% endif %} {% if question.required %}required{% endif %}>
+            <span class="option-key">{{ option.key }}</span>
+            <span>{{ option.text }}</span>
+          </label>
+        {% endfor %}
+      {% elif question.type == 'multiple' %}
+        {% for option in question.options %}
+          <label class="answer-option">
+            <input type="checkbox" name="answer" value="{{ option.key }}" {% if raw_value and option.key in raw_value %}checked{% endif %}>
+            <span class="option-key">{{ option.key }}</span>
+            <span>{{ option.text }}</span>
+          </label>
+        {% endfor %}
+      {% elif question.type == 'text' %}
+        <textarea name="answer" rows="5" class="large-input" {% if question.required %}required{% endif %} placeholder="请输入你的回答">{{ raw_value or '' }}</textarea>
+      {% elif question.type == 'number' %}
+        <input type="number" name="answer" step="{{ '1' if question.validation.integer_only else 'any' }}" class="large-input" value="{{ raw_value or '' }}" {% if question.required %}required{% endif %} placeholder="请输入数字">
+      {% endif %}
+    </div>
+
+    <div class="form-actions">
+      <button class="button primary" type="submit">{{ '提交问卷' if question_number == total_questions else '下一题' }}</button>
+    </div>
+  </form>
+</section>
+{% endblock %}
+

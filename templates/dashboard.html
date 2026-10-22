@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}我的问卷 · 问卷系统{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <span class="eyebrow">DASHBOARD</span>
+    <h1>我的问卷</h1>
+    <p class="muted">每个账号只能查看和管理自己创建的问卷。</p>
+  </div>
+  <a class="button primary" href="{{ url_for('surveys.create_survey') }}">＋ 新建问卷</a>
+</section>
+
+{% if surveys %}
+  <div class="survey-grid">
+    {% for survey in surveys %}
+      <article class="card survey-card">
+        <div class="card-row">
+          <span class="badge badge-{{ survey.status }}">
+            {% if survey.status == 'draft' %}草稿{% elif survey.status == 'published' %}收集中{% else %}已关闭{% endif %}
+          </span>
+          <span class="muted small">创建于 {{ format_local_datetime(survey.created_at) }}</span>
+        </div>
+        <h2><a href="{{ url_for('surveys.survey_detail', survey_id=survey._id) }}">{{ survey.title }}</a></h2>
+        <p class="description">{{ survey.description or '暂无问卷说明' }}</p>
+        <dl class="mini-stats">
+          <div><dt>已提交</dt><dd>{{ response_counts.get(survey._id|string, 0) }}</dd></div>
+          <div><dt>截止时间</dt><dd>{{ format_local_datetime(survey.deadline, '未设置') }}</dd></div>
+          <div><dt>匿名</dt><dd>{{ '允许' if survey.allow_anonymous else '不允许' }}</dd></div>
+        </dl>
+        <div class="card-actions">
+          <a class="button small" href="{{ url_for('surveys.survey_detail', survey_id=survey._id) }}">管理</a>
+          <a class="button small ghost" href="{{ url_for('surveys.stats', survey_id=survey._id) }}">统计</a>
+          {% if survey.status == 'published' %}
+            <a class="button small ghost" href="{{ url_for('public.survey_intro', public_id=survey.public_id, _external=True) }}" target="_blank">填写链接</a>
+          {% endif %}
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <section class="card empty-state">
+    <div class="empty-icon">＋</div>
+    <h2>还没有问卷</h2>
+    <p>从一份草稿开始，添加单选、多选、文本或数字题目，并配置条件跳转。</p>
+    <a class="button primary" href="{{ url_for('surveys.create_survey') }}">创建第一份问卷</a>
+  </section>
+{% endif %}
+{% endblock %}
+
