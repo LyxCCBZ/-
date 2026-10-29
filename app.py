@@ -19,10 +19,12 @@ def create_app(test_config=None):
 
     from routes.auth import bp as auth_bp
     from routes.public import bp as public_bp
+    from routes.question_bank import bp as question_bank_bp
     from routes.surveys import bp as surveys_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(surveys_bp)
+    app.register_blueprint(question_bank_bp)
     app.register_blueprint(public_bp)
 
     @app.before_request
@@ -57,6 +59,10 @@ def create_app(test_config=None):
     @app.errorhandler(404)
     def not_found(_error):
         return render_template("error.html", code=404, message="页面或资源不存在。"), 404
+
+    @app.errorhandler(403)
+    def forbidden(_error):
+        return render_template("error.html", code=403, message="你没有权限执行该操作。"), 403
 
     @app.errorhandler(500)
     def server_error(_error):

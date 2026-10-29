@@ -101,9 +101,31 @@
             </div>
           </div>
           <div class="form-actions">
+            <label class="check-line"><input type="checkbox" name="save_to_bank"> 同时保存到题库，方便以后复用</label>
             <button class="button primary" type="submit">添加题目</button>
           </div>
         </form>
+      </details>
+      <details class="add-question">
+        <summary>＋ 从题库选题</summary>
+        {% if bank_options %}
+          <form method="post" action="{{ url_for('question_bank.add_from_bank', survey_id=survey._id) }}" class="form-stack compact-form">
+            <p class="muted small">题目会以独立快照复制到本问卷：题库之后创建新版本，不会改变这份问卷。</p>
+            <label>选择题库题目与版本
+              <select name="version_id" required>
+                {% for item in bank_options %}
+                  <option value="{{ item.version_id }}">{{ item.title }}（v{{ item.version_number }} · {{ item.type_label }}{% if item.is_current %} · 当前版本{% endif %}{% if not item.is_owner %} · 来自 {{ item.owner_name }}{% endif %}）</option>
+                {% endfor %}
+              </select>
+            </label>
+            <div class="form-actions">
+              <button class="button primary" type="submit">添加到问卷</button>
+              <a class="button ghost" href="{{ url_for('question_bank.index') }}">管理题库</a>
+            </div>
+          </form>
+        {% else %}
+          <p class="muted small">题库还是空的。<a href="{{ url_for('question_bank.new_question') }}">先创建一道常用题目</a>，之后就能在这里直接选用。</p>
+        {% endif %}
       </details>
     {% endif %}
 
@@ -116,6 +138,9 @@
                 <span class="question-number">Q{{ question.order }}</span>
                 <span class="badge badge-type">{{ {'single':'单选','multiple':'多选','text':'文本','number':'数字'}[question.type] }}</span>
                 {% if question.required %}<span class="badge badge-required">必答</span>{% endif %}
+                {% if question.library_question_id %}
+                  <a class="badge badge-library" href="{{ url_for('question_bank.detail', bank_id=question.library_question_id) }}">题库 v{{ question.library_version_number }}</a>
+                {% endif %}
               </div>
               {% if survey.status == 'draft' %}
                 <form method="post" action="{{ url_for('surveys.delete_question', survey_id=survey._id, question_id=question._id) }}" onsubmit="return confirm('删除题目会同时清理指向它的跳转规则，确定删除吗？')">

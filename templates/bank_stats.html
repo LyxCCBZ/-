@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}{{ bank.title }} · 跨问卷统计{% endblock %}
+{% block content %}
+<section class="page-heading survey-heading">
+  <div>
+    <span class="eyebrow">CROSS-SURVEY STATISTICS</span>
+    <h1>{{ bank.title }}</h1>
+    <p class="muted">汇总这道题在不同问卷、不同版本中的回答。{% if not is_owner %}当前仅统计你自己创建的问卷。{% endif %}</p>
+  </div>
+  <div class="heading-actions">
+    <a class="button ghost" href="{{ url_for('question_bank.detail', bank_id=bank._id) }}">返回题目</a>
+    <a class="button ghost" href="{{ url_for('question_bank.index') }}">题库</a>
+  </div>
+</section>
+
+<section class="card stats-hero">
+  <div><span class="muted">使用问卷</span><strong>{{ survey_count }}</strong></div>
+  <div><span class="muted">答卷合计</span><strong>{{ response_count }}</strong></div>
+  <div><span class="muted">回答题次</span><strong>{{ total_answered }}</strong></div>
+  <div><span class="muted">涉及版本</span><strong>{{ versions|length }}</strong></div>
+</section>
+
+{% if not usages %}
+  <section class="card">
+    <div class="empty-inline">还没有任何问卷通过题库使用这道题，暂时没有可汇总的数据。</div>
+  </section>
+{% else %}
+  <div class="dashboard-columns">
+    <div class="side-column">
+      {% if option_totals %}
+        <section class="card">
+          <div class="section-heading">
+            <div>
+              <h2>选项总体分布</h2>
+              <p class="muted small">按“选项文本”合并；不同版本中同编号但含义不同的选项会被分开统计。</p>
+            </div>
+            <span class="pill">{{ option_totals|length }} 项</span>
+          </div>
+          <div class="bar-list">
+            {% for option in option_totals %}
+              <div>
+                <div class="bar-label">
+                  <span>{{ option.key }}. {{ option.text }}</span>
+                  <span>{{ option.count }} 次 · {{ option.percent }}%</span>
+                </div>
+                <div class="bar-track"><span style="width: {{ option.percent }}%"></span></div>
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
+
+      {% if number_summary.count %}
+        <section class="card">
+          <div class="section-heading">
+            <div>
+              <h2>数字题汇总</h2>
+              <p class="muted small">合并所有问卷和版本中的数字回答。</p>
+            </div>
+            <span class="pill">{{ number_summary.count }} 个回答</span>
+          </div>
+          <div class="number-summary">
+            <div><span>平均值</span><strong>{{ number_summary.average }}</strong></div>
+            <div><span>最小值</span><strong>{{ number_summary.minimum }}</strong></div>
+            <div><span>最大值</span><strong>{{ number_summary.maximum }}</strong></div>
+          </div>
+        </section>
+      {% endif %}
+
+      <section class="card">
+        <h2>按版本对比</h2>
+        <div class="version-timeline">
+          {% for version in versions %}
+            <article class="version-item">
+              <div class="version-head">
+                <div>
+                  <strong>v{{ version.version_number }}</strong>
+                  <span class="badge badge-type">{{ {'single':'单选','multiple':'多选','text':'文本','number':'数字'}[version.type] }}</span>
+                </div>
+                <span class="muted small">{{ version.usage_count }} 份问卷 · {{ version.answered_count }} 个回答</span>
+              </div>
+              <p class="version-title">{{ version.title }}</p>
+              {% if version.option_counts %}
+                <div class="bar-list">
+                  {% for option in version.option_counts %}
+                    <div>
+                      <div class="bar-label">
+                        <span>{{ option.key }}. {{ option.text }}</span>
+                        <span>{{ option.count }} 次 · {{ option.percent }}%</span>
+                      </div>
+                      <div class="bar-track"><span style="width: {{ option.percent }}%"></span></div>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% elif version.type == 'number' %}
+                <p class="muted small">平均 {{ version.average if version.average is not none else '-' }} · 最小 {{ version.minimum if version.minimum is not none else '-' }} · 最大 {{ version.maximum if version.maximum is not none else '-' }}</p>
+              {% endif %}
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+
+      {% if text_answers %}
+        <section class="card">
+          <div class="section-heading">
+            <div>
+              <h2>文本回答</h2>
+              <p class="muted small">最多展示最近汇总的 200 条回答内容。</p>
+            </div>
+            <span class="pill">{{ text_answers|length }} 条</span>
+          </div>
+          <div class="text-answers">
+            {% for answer in text_answers %}
+              <p>{{ answer.value }}<br><span class="muted small">{{ answer.survey_title }} · v{{ answer.version_number }}</span></p>
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
+    </div>
+
+    <aside class="side-column">
+      <section class="card">
+        <div class="section-heading">
+          <div>
+            <h2>使用明细</h2>
+            <p class="muted small">每个问卷使用这道题的版本和回答量。</p>
+          </div>
+          <span class="pill">{{ usages|length }} 处</span>
+        </div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr><th>问卷</th><th>版本</th><th>状态</th><th>回答</th></tr>
+            </thead>
+            <tbody>
+              {% for row in usages %}
+                <tr>
+                  <td>
+                    {% if row.survey.owner_id == current_user._id %}
+                      <a href="{{ url_for('surveys.stats', survey_id=row.survey._id) }}">{{ row.survey.title }}</a>
+                    {% else %}
+                      {{ row.survey.title }}
+                    {% endif %}
+                  </td>
+                  <td>v{{ row.question.library_version_number }}</td>
+                  <td>{{ '已发布' if row.survey.status == 'published' else ('草稿' if row.survey.status == 'draft' else '已关闭') }}</td>
+                  <td>{{ row.answered_count }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card side-info">
+        <h2>统计口径</h2>
+        <ul class="plain-list">
+          <li>只统计状态为“已提交”的答卷。</li>
+          <li>同一道题在不同问卷中各自计数。</li>
+          <li>选项按文本合并，避免版本间编号含义变化。</li>
+          <li>未作答的题次不计入回答量。</li>
+        </ul>
+      </section>
+    </aside>
+  </div>
+{% endif %}
+{% endblock %}

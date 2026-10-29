@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}题库 · 简问{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <span class="eyebrow">QUESTION LIBRARY</span>
+    <h1>题库</h1>
+    <p class="muted">把常用题目沉淀下来，多份问卷可以选用同一道题，也可以按版本各自使用。</p>
+  </div>
+  <div class="heading-actions">
+    <a class="button primary" href="{{ url_for('question_bank.new_question') }}">＋ 新建题目</a>
+  </div>
+</section>
+
+<div class="dashboard-columns">
+  <section class="card">
+    <div class="section-heading">
+      <div>
+        <h2>我的题目</h2>
+        <p class="muted small">修改会生成新版本，已有问卷继续使用它们各自的快照。</p>
+      </div>
+      <span class="pill">{{ owned|length }} 道</span>
+    </div>
+    {% if owned %}
+      <div class="bank-list">
+        {% for bank in owned %}
+          <div class="bank-row">
+            <div>
+              <div class="card-row left">
+                <a class="bank-title" href="{{ url_for('question_bank.detail', bank_id=bank._id) }}">{{ bank.title }}</a>
+                <span class="badge badge-type">{{ {'single':'单选','multiple':'多选','text':'文本','number':'数字'}[bank.type] }}</span>
+              </div>
+              <p class="muted small bank-meta">
+                <span>当前 v{{ bank.current_version }}</span>
+                <span>{{ version_counts[bank._id] }} 个版本</span>
+                <span>被 {{ usage_counts.get(bank._id, 0) }} 份问卷使用</span>
+                <span>更新于 {{ format_local_datetime(bank.updated_at) }}</span>
+              </p>
+            </div>
+            <div class="inline-actions">
+              <a class="button small ghost" href="{{ url_for('question_bank.stats', bank_id=bank._id) }}">跨问卷统计</a>
+              <a class="button small" href="{{ url_for('question_bank.detail', bank_id=bank._id) }}">管理</a>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-inline">还没有保存过题目。新建题目后，就能在问卷编辑页直接选用。</div>
+    {% endif %}
+  </section>
+
+  <aside class="side-column">
+    <section class="card">
+      <div class="section-heading">
+        <div>
+          <h2>共享给我的</h2>
+          <p class="muted small">共享题目可直接用于你的问卷；如需独立改版，可复制为自己的题目。</p>
+        </div>
+        <span class="pill">{{ shared|length }} 道</span>
+      </div>
+      {% if shared %}
+        <div class="bank-list">
+          {% for bank in shared %}
+            <div class="bank-row compact">
+              <div>
+                <a class="bank-title" href="{{ url_for('question_bank.detail', bank_id=bank._id) }}">{{ bank.title }}</a>
+                <p class="muted small bank-meta">
+                  <span>来自 {{ owners.get(bank.owner_id, '未知用户') }}</span>
+                  <span>v{{ bank.current_version }}</span>
+                  <span>{{ version_counts[bank._id] }} 个版本</span>
+                </p>
+              </div>
+              <a class="button small ghost" href="{{ url_for('question_bank.detail', bank_id=bank._id) }}">查看</a>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-inline">暂时没有其他用户共享给你的题目。</div>
+      {% endif %}
+    </section>
+
+    <section class="card side-info">
+      <h2>版本规则</h2>
+      <ul class="plain-list">
+        <li>已发布问卷中的题目不可修改。</li>
+        <li>题库改题只会生成新版本。</li>
+        <li>问卷使用的是选题当时的快照。</li>
+        <li>恢复旧版本也会生成一个新版本。</li>
+      </ul>
+    </section>
+  </aside>
+</div>
+{% endblock %}

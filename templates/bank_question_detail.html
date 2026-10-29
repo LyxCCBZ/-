@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+{% block title %}{{ bank.title }} · 题库{% endblock %}
+{% block content %}
+<section class="page-heading survey-heading">
+  <div>
+    <div class="card-row left">
+      <span class="badge badge-type">{{ {'single':'单选','multiple':'多选','text':'文本','number':'数字'}[bank.type] }}</span>
+      <span class="badge badge-library">当前 v{{ bank.current_version }}</span>
+      {% if is_owner %}
+        <span class="badge badge-draft">我的题目</span>
+      {% else %}
+        <span class="badge badge-closed">共享题目</span>
+      {% endif %}
+    </div>
+    <h1>{{ bank.title }}</h1>
+    <p class="muted">创建于 {{ format_local_datetime(bank.created_at) }} · 最近更新 {{ format_local_datetime(bank.updated_at) }}</p>
+  </div>
+  <div class="heading-actions">
+    <a class="button primary" href="{{ url_for('question_bank.stats', bank_id=bank._id) }}">跨问卷统计</a>
+    <a class="button ghost" href="{{ url_for('question_bank.index') }}">返回题库</a>
+  </div>
+</section>
+
+{% if not is_owner %}
+  <section class="share-banner">
+    <div>
+      <strong>这是一道共享题目</strong>
+      <p class="muted small">你可以直接在草稿问卷中选用它。若需要独立修改，请复制为自己的题目；原题的所有者仍可继续更新版本。</p>
+    </div>
+    <form method="post" action="{{ url_for('question_bank.fork', bank_id=bank._id) }}">
+      <button class="button" type="submit">复制为我的题目</button>
+    </form>
+  </section>
+{% endif %}
+
+<div class="dashboard-columns">
+  <div class="side-column">
+    <section class="card">
+      <div class="section-heading">
+        <div>
+          <h2>当前内容（v{{ bank.current_version }}）</h2>
+          <p class="muted small">这是题库中的最新版本；各问卷仍使用各自选题时的快照。</p>
+        </div>
+      </div>
+      {% if current %}
+        <h3>{{ current.title }}</h3>
+        {% if current.options %}
+          <ul class="option-list">
+            {% for option in current.options %}
+              <li><span>{{ option.key }}</span>{{ option.text }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        {% if current.type == 'multiple' %}
+          <p class="muted small">选择数量：{{ current.validation.min_select }} - {{ current.validation.max_select }}</p>
+        {% elif current.type == 'text' %}
+          <p class="muted small">字数：{{ current.validation.min_length }} - {{ current.validation.max_length or '不限' }}</p>
+        {% elif current.type == 'number' %}
+          <p class="muted small">范围：{{ current.validation.minimum if current.validation.minimum is not none else '不限' }} ~ {{ current.validation.maximum if current.validation.maximum is not none else '不限' }}；{{ '仅整数' if current.validation.integer_only else '可为小数' }}</p>
+        {% endif %}
+        <p class="muted small">{{ '必答题' if current.required else '选答题' }} · 创建于 {{ format_local_datetime(current.created_at) }}</p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <div class="section-heading">
+        <div>
+          <h2>版本历史</h2>
+          <p class="muted small">每个版本都保留完整内容；恢复旧版本会生成一个新版本，不会删除历史。</p>
+        </div>
+        <span class="pill">{{ versions|length }} 个</span>
+      </div>
+      <div class="version-timeline">
+        {% for version in versions %}
+          <article class="version-item {% if version._id == bank.current_version_id %}current{% endif %}">
+            <div class="version-head">
+              <div>
+                <strong>v{{ version.version_number }}</strong>
+                {% if version._id == bank.current_version_id %}<span class="badge badge-published">当前</span>{% endif %}
+                {% if version.restored_label %}<span class="badge badge-draft">恢复自 {{ version.restored_label }}</span>{% endif %}
+              </div>
+              <span class="muted small">{{ format_local_datetime(version.created_at) }}</span>
+            </div>
+            <p class="version-title">{{ version.title }}</p>
+            <p class="muted small">父版本：{{ version.parent_label }} · 题型：{{ {'single':'单选','multiple':'多选','text':'文本','number':'数字'}[version.type] }}{% if version.options %} · {{ version.options|length }} 个选项{% endif %}</p>
+            <details>
+              <summary>查看该版本内容</summary>
+              {% if version.options %}
+                <ul class="option-list">
+                  {% for option in version.options %}
+                    <li><span>{{ option.key }}</span>{{ option.text }}</li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
+              {% if version.type == 'multiple' %}
+                <p class="muted small">选择数量：{{ version.validation.min_select }} - {{ version.validation.max_select }}</p>
+              {% elif version.type == 'text' %}
+                <p class="muted small">字数：{{ version.validation.min_length }} - {{ version.validation.max_length or '不限' }}</p>
+              {% elif version.type == 'number' %}
+                <p class="muted small">范围：{{ version.validation.minimum if version.validation.minimum is not none else '不限' }} ~ {{ version.validation.maximum if version.validation.maximum is not none else '不限' }}</p>
+              {% endif %}
+            </details>
+            {% if is_owner and version._id != bank.current_version_id %}
+              <form method="post" action="{{ url_for('question_bank.restore_version', bank_id=bank._id, version_id=version._id) }}" class="inline-form" onsubmit="return confirm('将以 v{{ version.version_number }} 的内容创建一个新版本，确定恢复吗？')">
+                <button class="button small ghost" type="submit">恢复此版本</button>
+              </form>
+            {% endif %}
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+
+    {% if is_owner %}
+      <section class="card">
+        <h2>创建新版本</h2>
+        <p class="muted small">保存后会生成 v{{ bank.current_version + 1 }}。原有问卷和已有版本完全不受影响；如果需要让某份草稿问卷使用新版本，请重新从题库选题。</p>
+        <form method="post" action="{{ url_for('question_bank.create_version', bank_id=bank._id) }}" class="form-stack" id="version-form">
+          <div class="two-columns">
+            <label>题型
+              <select name="type" id="version-type" required>
+                {% for value, label in [('single','单选题'),('multiple','多选题'),('text','文本填空'),('number','数字填空')] %}
+                  <option value="{{ value }}" {% if current and current.type == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="check-line top-align"><input type="checkbox" name="required" {% if current and current.required %}checked{% endif %}> 必答题</label>
+          </div>
+          <label>题目内容 <span class="required-mark">*</span>
+            <input name="title" maxlength="300" required value="{{ current.title if current else '' }}">
+          </label>
+          <div class="type-fields" data-types="single multiple">
+            <label>选项（每行一个）
+              <textarea name="options" rows="5">{{ current.options|map(attribute='text')|join('\n') if current else '' }}</textarea>
+            </label>
+          </div>
+          <div class="type-fields" data-types="multiple">
+            <div class="two-columns">
+              <label>最少选择数量
+                <input type="number" name="min_select" min="0" value="{{ current.validation.min_select if current and current.type == 'multiple' else 0 }}">
+              </label>
+              <label>最多选择数量
+                <input type="number" name="max_select" min="1" value="{{ current.validation.max_select if current and current.type == 'multiple' else '' }}" placeholder="留空表示不限">
+              </label>
+            </div>
+          </div>
+          <div class="type-fields" data-types="text">
+            <div class="two-columns">
+              <label>最少字数
+                <input type="number" name="min_length" min="0" value="{{ current.validation.min_length if current and current.type == 'text' else 0 }}">
+              </label>
+              <label>最多字数
+                <input type="number" name="max_length" min="1" value="{{ current.validation.max_length if current and current.type == 'text' and current.validation.max_length is not none else '' }}" placeholder="留空表示不限">
+              </label>
+            </div>
+          </div>
+          <div class="type-fields" data-types="number">
+            <div class="three-columns">
+              <label>最小值
+                <input type="number" step="any" name="minimum" value="{{ current.validation.minimum if current and current.type == 'number' and current.validation.minimum is not none else '' }}" placeholder="不限">
+              </label>
+              <label>最大值
+                <input type="number" step="any" name="maximum" value="{{ current.validation.maximum if current and current.type == 'number' and current.validation.maximum is not none else '' }}" placeholder="不限">
+              </label>
+              <label class="check-line top-align"><input type="checkbox" name="integer_only" {% if current and current.type == 'number' and current.validation.integer_only %}checked{% endif %}> 只允许整数</label>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="button primary" type="submit">创建新版本</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>共享给其他用户</h2>
+        <p class="muted small">被共享的用户可以在自己的问卷中选用这道题，但不能修改你的题库；对方也可以复制为自有题目后独立改版。</p>
+        <form method="post" action="{{ url_for('question_bank.share', bank_id=bank._id) }}" class="form-stack compact-form">
+          <label>用户名（多个用逗号分隔）
+            <input name="usernames" placeholder="例如：student01, student02">
+          </label>
+          <div class="form-actions">
+            <button class="button" type="submit">共享题目</button>
+          </div>
+        </form>
+        {% if shared_users %}
+          <div class="shared-user-list">
+            {% for user in shared_users %}
+              <div class="shared-user-row">
+                <span>{{ user.username }}</span>
+                <form method="post" action="{{ url_for('question_bank.unshare', bank_id=bank._id) }}">
+                  <input type="hidden" name="user_id" value="{{ user._id }}">
+                  <button class="text-danger small" type="submit">取消共享</button>
+                </form>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="muted small">尚未共享给其他用户。</p>
+        {% endif %}
+      </section>
+    {% endif %}
+  </div>
+
+  <aside class="side-column">
+    <section class="card">
+      <div class="section-heading">
+        <div>
+          <h2>使用情况</h2>
+          <p class="muted small">{% if is_owner %}所有使用这道题的问卷。{% else %}只显示你自己创建的问卷。{% endif %}</p>
+        </div>
+        <span class="pill">{{ usages|length }} 处</span>
+      </div>
+      {% if usages %}
+        <div class="bank-list">
+          {% for row in usages %}
+            <div class="bank-row compact">
+              <div>
+                {% if row.survey.owner_id == current_user._id %}
+                  <a class="bank-title" href="{{ url_for('surveys.stats', survey_id=row.survey._id) }}">{{ row.survey.title }}</a>
+                {% else %}
+                  <span class="bank-title">{{ row.survey.title }}</span>
+                {% endif %}
+                <p class="muted small bank-meta">
+                  <span>Q{{ row.question.order }} · 使用 v{{ row.question.library_version_number }}</span>
+                  <span>{{ '已发布' if row.survey.status == 'published' else ('草稿' if row.survey.status == 'draft' else '已关闭') }}</span>
+                  <span>{{ row.answered_count }} 份回答</span>
+                </p>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-inline">目前还没有问卷使用这道题。</div>
+      {% endif %}
+    </section>
+
+    <section class="card side-info">
+      <h2>修改会怎样？</h2>
+      <ul class="plain-list">
+        <li>新建版本只影响之后从题库选题的问卷。</li>
+        <li>已经发布的问卷锁定题目，不受影响。</li>
+        <li>草稿问卷如需换版，删除旧题后重新选题。</li>
+        <li>历史版本永久保留，可随时恢复。</li>
+      </ul>
+    </section>
+  </aside>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  const typeSelect = document.getElementById('version-type');
+  const refreshFields = () => {
+    if (!typeSelect) return;
+    const active = typeSelect.value;
+    document.querySelectorAll('.type-fields').forEach((node) => {
+      const visible = node.dataset.types.split(' ').includes(active);
+      node.hidden = !visible;
+      node.querySelectorAll('input, textarea, select').forEach((input) => {
+        input.disabled = !visible;
+      });
+    });
+  };
+  if (typeSelect) {
+    typeSelect.addEventListener('change', refreshFields);
+    refreshFields();
+  }
+</script>
+{% endblock %}

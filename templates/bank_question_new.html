@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}新建题库题目 · 简问{% endblock %}
+{% block content %}
+<div class="narrow-page">
+  <section class="page-heading compact">
+    <div>
+      <span class="eyebrow">QUESTION LIBRARY</span>
+      <h1>新建题库题目</h1>
+      <p class="muted">保存后会创建 v1，可被多份问卷重复选用。</p>
+    </div>
+    <a class="button ghost" href="{{ url_for('question_bank.index') }}">返回题库</a>
+  </section>
+
+  <section class="card">
+    <form method="post" action="{{ url_for('question_bank.new_question') }}" class="form-stack" id="bank-question-form">
+      <div class="two-columns">
+        <label>题型
+          <select name="type" id="question-type" required>
+            <option value="single">单选题</option>
+            <option value="multiple">多选题</option>
+            <option value="text">文本填空</option>
+            <option value="number">数字填空</option>
+          </select>
+        </label>
+        <label class="check-line top-align"><input type="checkbox" name="required"> 必答题</label>
+      </div>
+      <label>题目内容 <span class="required-mark">*</span>
+        <input name="title" maxlength="300" required placeholder="例如：你的年龄段是？">
+      </label>
+      <div class="type-fields" data-types="single multiple">
+        <label>选项（每行一个）
+          <textarea name="options" rows="5" placeholder="18 岁以下&#10;18-25 岁&#10;26-35 岁"></textarea>
+        </label>
+      </div>
+      <div class="type-fields" data-types="multiple">
+        <div class="two-columns">
+          <label>最少选择数量
+            <input type="number" name="min_select" min="0" value="0">
+          </label>
+          <label>最多选择数量
+            <input type="number" name="max_select" min="1" placeholder="留空表示不限">
+          </label>
+        </div>
+      </div>
+      <div class="type-fields" data-types="text">
+        <div class="two-columns">
+          <label>最少字数
+            <input type="number" name="min_length" min="0" value="0">
+          </label>
+          <label>最多字数
+            <input type="number" name="max_length" min="1" placeholder="留空表示不限">
+          </label>
+        </div>
+      </div>
+      <div class="type-fields" data-types="number">
+        <div class="three-columns">
+          <label>最小值
+            <input type="number" step="any" name="minimum" placeholder="不限">
+          </label>
+          <label>最大值
+            <input type="number" step="any" name="maximum" placeholder="不限">
+          </label>
+          <label class="check-line top-align"><input type="checkbox" name="integer_only"> 只允许整数</label>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="button primary" type="submit">保存到题库</button>
+        <a class="button ghost" href="{{ url_for('question_bank.index') }}">取消</a>
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  const typeSelect = document.getElementById('question-type');
+  const refreshFields = () => {
+    if (!typeSelect) return;
+    const active = typeSelect.value;
+    document.querySelectorAll('.type-fields').forEach((node) => {
+      const visible = node.dataset.types.split(' ').includes(active);
+      node.hidden = !visible;
+      node.querySelectorAll('input, textarea, select').forEach((input) => {
+        input.disabled = !visible;
+      });
+    });
+  };
+  if (typeSelect) {
+    typeSelect.addEventListener('change', refreshFields);
+    refreshFields();
+  }
+</script>
+{% endblock %}

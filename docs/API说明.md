@@ -2,7 +2,7 @@
 
 ## 1. 接口风格
 
-第一阶段以服务端渲染页面为主，接口分为三类：
+系统以服务端渲染页面为主，接口分为三类：
 
 1. 表单接口：提交后 302 重定向到页面。
 2. 页面接口：返回 HTML。
@@ -125,6 +125,7 @@
 | minimum | number | 最小值，可空 |
 | maximum | number | 最大值，可空 |
 | integer_only | number | 出现即只允许整数 |
+| save_to_bank | 全部 | 可选；出现时同时把题目保存到当前用户题库并创建 v1 |
 
 成功：302 回管理页，order 自动递增。  
 失败：提示题型、选项、数量或范围错误。
@@ -280,4 +281,121 @@
 - 公开链接使用随机 public_id，不使用递增数据库 ID。
 - 答卷操作使用会话内随机令牌与数据库中的 SHA-256 哈希比对，防止答卷 ID 被猜测后篡改。
 - 登录后的 next 参数只接受站内相对地址，避免开放重定向。
-- 生产环境还应增加 CSRF Token、HTTPS、登录限流与安全响应头；这些属于第二阶段或部署加固范围。
+- 生产环境还应增加 CSRF Token、HTTPS、登录限流与安全响应头；这些属于后续部署加固范围。
+
+## 8. 题库与版本接口（第二阶段）
+
+以下接口均要求登录。题库详情与统计对“所有者或被共享用户”开放；创建版本、共享、取消共享仅所有者可用，越权返回 403；完全无权访问返回 404。
+
+### GET /question-bank
+
+返回题库页面：我的题目、共享给我的题目、每个题目的版本数与被使用次数。
+
+### GET /question-bank/new
+
+返回新建题库题目页面，表单字段与 `POST /surveys/ID/questions` 的题目字段一致。
+
+### POST /question-bank
+
+新建题库题目并自动创建 v1。
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| type | 是 | single / multiple / text / number |
+| title | 是 | 题目内容，最多 300 字 |
+| required | 否 | 出现即必答 |
+| options | 选择题 | 每行一个选项，至少两个 |
+| min_select / max_select | 多选 | 选择数量限制 |
+| min_length / max_length | 文本 | 字数限制 |
+| minimum / maximum / integer_only | 数字 | 范围与整数限制 |
+
+成功：302 到 `/question-bank/新题目ID`。  
+失败：回新建页并提示校验错误。  
+`POST /question-bank/new` 提供同样的创建能力，主要用于无 JavaScript 的表单页面。
+
+### GET /question-bank/ID
+
+返回题目详情：当前内容、全部历史版本、版本父子关系、恢复来源、共享用户、使用该题的问卷列表。
+
+### POST /question-bank/ID/versions
+
+仅所有者可用。以当前版本为基础创建新版本，版本号自动递增，旧版本与旧问卷快照不变。
+
+表单字段与新建题库题目一致。
+
+成功：302 回详情页，提示新版本号。
+
+### POST /question-bank/ID/restore/VERSION_ID
+
+仅所有者可用。以指定历史版本的内容创建一个新版本，并记录 `restored_from_version_id`；不会删除或覆盖任何历史版本。
+
+### POST /question-bank/ID/share
+
+仅所有者可用。
+
+| 字段 | 说明 |
+| --- | --- |
+| usernames | 用户名，多个用逗号分隔 |
+
+已存在用户会被加入 shared_with；不存在的用户会给出警告；不能共享给自己。
+
+### POST /question-bank/ID/unshare
+
+仅所有者可用。
+
+| 字段 | 说明 |
+| --- | --- |
+| user_id | 要取消共享的用户 ObjectId |
+
+取消共享不会删除对方已创建问卷中的题目快照。
+
+### POST /question-bank/ID/fork
+
+被共享用户可用。把当前版本复制为自己的题库题目（v1），之后可独立改版；原题目不受影响。
+
+### GET /question-bank/ID/stats
+
+返回跨问卷统计页面。所有者看到所有问卷；被共享用户只看到自己创建的问卷。
+
+### GET /api/question-bank/ID/stats
+
+返回跨问卷统计 JSON。主要字段：
+
+    {
+      "bank": { "_id": "...", "title": "...", "current_version": 2 },
+      "is_owner": true,
+      "usage_count": 2,
+      "survey_count": 2,
+      "response_count": 2,
+      "total_answered": 2,
+      "versions": [
+        {
+          "version_number": 1,
+          "usage_count": 1,
+          "answered_count": 1,
+          "option_counts": [
+            { "key": "A", "text": "满意", "count": 1, "percent": 100.0 }
+          ]
+        }
+      ],
+      "option_totals": [
+        { "key": "A", "text": "满意", "count": 1, "percent": 50.0 }
+      ],
+      "number_summary": { "average": 25, "minimum": 20, "maximum": 30, "count": 2 },
+      "text_answers": [],
+      "usages": [
+        { "survey": { "title": "..." }, "question": { "order": 1 }, "version_number": 1, "answered_count": 1 }
+      ]
+    }
+
+选项统计按“选项 key + 该快照中的选项文本”合并；百分比以回答该题的次数为分母。
+
+### POST /surveys/ID/questions/from-bank
+
+仅问卷所有者、且问卷为 draft 时可用。
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| version_id | 是 | 题库版本 ObjectId |
+
+服务端复制该版本内容到 questions，生成独立题目快照，自动追加到问卷末尾，并记录 library_* 来源字段。已发布问卷调用会被拒绝。

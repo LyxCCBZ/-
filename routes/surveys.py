@@ -4,6 +4,7 @@ from flask import Blueprint, abort, flash, g, jsonify, redirect, render_template
 
 from db import get_db
 from security import login_required, utcnow
+from services import question_bank as bank_service
 from services.rules import describe_condition, ordered_questions
 from services.statistics import response_counts_by_survey, survey_statistics
 from services.validation import ValidationError, build_question_document, parse_jump_condition
@@ -123,6 +124,7 @@ def survey_detail(survey_id):
         submission_count=submission_count,
         draft_count=draft_count,
         deadline_value=datetime_local_value(survey.get("deadline")),
+        bank_options=bank_service.bank_options_for_survey(get_db(), g.current_user["_id"]),
     )
 
 
@@ -209,7 +211,14 @@ def add_question(survey_id):
         return redirect(url_for("surveys.survey_detail", survey_id=survey["_id"]))
     try:
         question = build_question_document(request.form)
-        last = get_db().questions.find_one({"survey_id": survey["_id"]}, sort=[("order", -1)])
+        db = get_db()
+        saved_to_bank = False
+        if request.form.get("save_to_bank"):
+            bank = bank_service.create_bank_question(db, g.current_user["_id"], request.form)
+            version = bank_service.current_version(db, bank)
+            question.update(bank_service.link_fields(bank, version))
+            saved_to_bank = True
+        last = db.questions.find_one({"survey_id": survey["_id"]}, sort=[("order", -1)])
         now = utcnow()
         question.update(
             {
@@ -219,8 +228,11 @@ def add_question(survey_id):
                 "updated_at": now,
             }
         )
-        get_db().questions.insert_one(question)
-        flash("题目已添加。", "success")
+        db.questions.insert_one(question)
+        if saved_to_bank:
+            flash("题目已添加，并同时保存到题库（v1）。", "success")
+        else:
+            flash("题目已添加。", "success")
     except ValidationError as exc:
         flash(exc.message, "error")
     return redirect(url_for("surveys.survey_detail", survey_id=survey["_id"]))

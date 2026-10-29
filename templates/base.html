@@ -13,6 +13,7 @@
       <nav>
         {% if current_user %}
           <a href="{{ url_for('surveys.dashboard') }}">我的问卷</a>
+          <a href="{{ url_for('question_bank.index') }}">题库</a>
           <span class="user-name">{{ current_user.username }}</span>
           <form action="{{ url_for('auth.logout') }}" method="post" class="inline-form">
             <button class="link-button" type="submit">退出</button>
@@ -38,7 +39,7 @@
     {% block content %}{% endblock %}
   </main>
 
-  <footer class="footer">课程大作业 · 第一阶段 · Flask + MongoDB</footer>
+  <footer class="footer">课程大作业 · 第二阶段 · Flask + MongoDB</footer>
   {% block scripts %}{% endblock %}
 </body>
 </html>

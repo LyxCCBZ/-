@@ -57,6 +57,10 @@ def ensure_database(db):
             "required": ["survey_id", "order", "type", "title", "required", "options", "validation", "jumps"],
             "properties": {
                 "survey_id": {"bsonType": "objectId"},
+                "library_question_id": {"bsonType": ["objectId", "null"]},
+                "library_version_id": {"bsonType": ["objectId", "null"]},
+                "library_version_number": {"bsonType": ["int", "null"]},
+                "library_owner_id": {"bsonType": ["objectId", "null"]},
                 "order": {"bsonType": "int", "minimum": 1},
                 "type": {"enum": ["single", "multiple", "text", "number"]},
                 "title": {"bsonType": "string", "minLength": 1, "maxLength": 300},
@@ -92,6 +96,56 @@ def ensure_database(db):
                 "submitted_at": {"bsonType": ["date", "null"]},
             },
         },
+        "question_bank": {
+            "bsonType": "object",
+            "required": [
+                "owner_id",
+                "title",
+                "type",
+                "current_version_id",
+                "current_version",
+                "shared_with",
+                "created_at",
+                "updated_at",
+            ],
+            "properties": {
+                "owner_id": {"bsonType": "objectId"},
+                "title": {"bsonType": "string", "minLength": 1, "maxLength": 300},
+                "type": {"enum": ["single", "multiple", "text", "number"]},
+                "current_version_id": {"bsonType": "objectId"},
+                "current_version": {"bsonType": "int", "minimum": 1},
+                "shared_with": {"bsonType": "array", "items": {"bsonType": "objectId"}},
+                "created_at": {"bsonType": "date"},
+                "updated_at": {"bsonType": "date"},
+            },
+        },
+        "question_versions": {
+            "bsonType": "object",
+            "required": [
+                "bank_id",
+                "version_number",
+                "title",
+                "type",
+                "required",
+                "options",
+                "validation",
+                "created_by",
+                "created_at",
+            ],
+            "properties": {
+                "bank_id": {"bsonType": "objectId"},
+                "version_number": {"bsonType": "int", "minimum": 1},
+                "title": {"bsonType": "string", "minLength": 1, "maxLength": 300},
+                "type": {"enum": ["single", "multiple", "text", "number"]},
+                "required": {"bsonType": "bool"},
+                "options": {"bsonType": "array"},
+                "validation": {"bsonType": "object"},
+                "parent_version_id": {"bsonType": ["objectId", "null"]},
+                "restored_from_version_id": {"bsonType": ["objectId", "null"]},
+                "created_by": {"bsonType": "objectId"},
+                "created_at": {"bsonType": "date"},
+            },
+        },
     }
 
     existing = set(db.list_collection_names())
@@ -112,6 +166,12 @@ def ensure_database(db):
     db.surveys.create_index([("public_id", ASCENDING)], unique=True, name="uq_public_id")
     db.surveys.create_index([("owner_id", ASCENDING), ("created_at", DESCENDING)], name="idx_owner_created")
     db.questions.create_index([("survey_id", ASCENDING), ("order", ASCENDING)], unique=True, name="uq_survey_order")
+    db.questions.create_index([("library_question_id", ASCENDING)], sparse=True, name="idx_library_question")
+    db.questions.create_index([("library_version_id", ASCENDING)], sparse=True, name="idx_library_version")
+    db.question_bank.create_index([("owner_id", ASCENDING), ("updated_at", DESCENDING)], name="idx_bank_owner_updated")
+    db.question_bank.create_index([("shared_with", ASCENDING), ("updated_at", DESCENDING)], name="idx_bank_shared")
+    db.question_versions.create_index([("bank_id", ASCENDING), ("version_number", ASCENDING)], unique=True, name="uq_bank_version")
+    db.question_versions.create_index([("bank_id", ASCENDING), ("created_at", DESCENDING)], name="idx_bank_version_created")
     db.responses.create_index([("survey_id", ASCENDING), ("status", ASCENDING)], name="idx_survey_status")
     if "idx_survey_respondent" in db.responses.index_information():
         db.responses.drop_index("idx_survey_respondent")
